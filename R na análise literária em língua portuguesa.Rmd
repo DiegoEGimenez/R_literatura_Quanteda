@@ -1,5 +1,5 @@
 ---
-title: 'R na análise literária em língua portuguesa'
+title: 'R na análise literária em português'
 author: "Diego Giménez"
 output:
   html_document:
@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
-Códigos de R utilizados para a análise literária à distância em língua portuguesa (Giménez, 2024). Este documento atualiza e amplia uma versão prévia feita por Diego Giménez e Andresa Gomide em 2022 para a análise do "Livro do Desassossego"
+Códigos de R utilizados para a análise literária à distância em língua portuguesa (Giménez, 2024). Este documento atualiza e amplia uma versão prévia feita por Diego Giménez e Andressa Gomide em 2022 para a análise do "Livro do Desassossego"
 
 
 ## 1 Ferramentas e preparação dos dados
