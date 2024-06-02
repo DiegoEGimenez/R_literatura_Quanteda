@@ -407,7 +407,7 @@ Os dados e códigos estão disponíveis via github
 <https://github.com/DiegoEGimenez/R_literatura_Quanteda>
 
 O código pode ser visualizado em 
-<https://rpubs.com/DiegoEGimenez/1191347>
+<https://rpubs.com/DiegoEGimenez/1191458>
 
 ***
 
