@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
-Códigos en R utilizados para análisis literario a distancia en lengua portuguesa (Giménez, 2024). Este documento actualiza y amplía una versión anterior desarrollada por Diego Giménez y Andresa Gomide en 2022, que se centraba en el análisis del "Libro del desasosiego". En esta nueva versión, se analizan obras de Miguel de Cervantes, incluyendo "Don Quijote", "Los trabajos de Persiles y Sigismunda", "Novelas ejemplares", "El Cerco de Numancia" y "Galatea".
+Códigos en R utilizados para análisis literario a distancia en español (Giménez, 2024). Este documento actualiza y amplía una versión anterior desarrollada por Diego Giménez y Andresa Gomide en 2022, que se centraba en el análisis del "Libro del desasosiego". En esta nueva versión, se analizan obras de Miguel de Cervantes, incluyendo "Don Quijote", "Los trabajos de Persiles y Sigismunda", "Novelas ejemplares", "El Cerco de Numancia" y "Galatea".
 
 ## Herramientas y preparación de los datos
 
