@@ -351,16 +351,16 @@ El código a continuación demuestra la aplicación del modelo Latent Dirichlet 
 
 ```{r}
 # Modelización de tópicos a partir del corpus formado por un único documento
-lda <- LDA(dfm_selected_unico, k = 10)
-terms(lda, 10)
+tmod_lda <- textmodel_lda(dfm_selected_unico, k = 10)
+terms(tmod_lda, 10)
 
 ```
 
 ```{r}
 # Modelización de tópicos a partir de un corpus formado por varios documentos
 
-lda <- LDA(dfm_selected_files, k = 10)
-terms(lda, 10)
+tmod_lda <- textmodel_lda(dfm_selected_files, k = 10)
+terms(tmod_lda, 10)
 
 ```
 
