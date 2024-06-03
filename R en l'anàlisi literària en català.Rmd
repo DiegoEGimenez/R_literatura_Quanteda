@@ -350,16 +350,16 @@ Una altra funció freqüentment utilitzada en el Processament del Llenguatge Nat
 
 ```{r}
 # Topic modeling a partir del corpus format per un únic document
-tmod_lda <- textmodel_lda(dfm_selected_unico, k = 10, verbose = TRUE)
-terms(tmod_lda, 10)
+lda <- LDA(dfm_selected_unico, k = 10)
+terms(lda, 10)
 ```
 
 
 ```{r}
 # Topic modeling a partir d'un corpus format per diversos documents
 
-tmod_lda <- textmodel_lda(dfm_selected_files, k = 10, verbose = TRUE)
-terms(tmod_lda, 10)
+lda <- LDA(dfm_selected_files, k = 10)
+terms(lda, 10)
 
 ```
 
