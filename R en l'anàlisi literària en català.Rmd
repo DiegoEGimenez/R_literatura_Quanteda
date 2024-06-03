@@ -1,0 +1,415 @@
+---
+title: 'R: anàlisi literària en català'
+author: "Diego Giménez"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Còdigs en R utilitzats per a l'anàlisi literària a distància en llengua catalana (Giménez, 2024). Aquest document actualitza i amplia una versió anterior desenvolupada per Diego Giménez i Andresa Gomide el 2022, que se centrava en l'anàlisi del "Llibre del Desassossec". En aquesta nova versió, s'analitzen obres de Josep Roig i Raventós, incloent "Ànimes atuïdes" i "Argelaga florida".
+
+## 1 Eines i preparació de les dades
+
+### 1.1 IInstal·lació
+
+[Quanteda](https://quanteda.io/) (Quantitative Analysis of Textual Data) és un paquet de R per a la manipulació i anàlisi de dades textuals.
+
+La instal·lació de R varia segons el sistema operatiu (ex.: Windows, Mac, Linux), així com les seves diferents versions. Hi ha diverses fonts on es poden obtenir instruccions actualitzades sobre com instal·lar R (ex.: https://didatica.tech/como-instalar-a-linguagem-r-e-o-rstudio/). El Comprehensive R Archive Network (CRAN), la xarxa oficial de distribució de R, ofereix instruccions fiables per a tal fi, encara que potser no tan detallades com en altres fonts.
+
+Una altra suggerència és instal·lar una interfície gràfica d'usuari, de l'anglès Graphical User Interface (GUI). Les GUI faciliten considerablement la interacció de l'usuari amb l'ordinador. El (RStudio) és la GUI més utilitzada per a R i, igual que R, és gratuïta i de codi obert.
+
+
+### 1.2 Configuració: preparant l'entorn.
+
+En reutilitzar codis, és una bona pràctica estar atent a la versió instal·lada tant de R com de les biblioteques utilitzades. No és necessari que les versions siguin les mateixes que les utilitzades durant la creació dels codis, tanmateix, en alguns casos, pot no haver-hi compatibilitat entre versions diferents i algunes funcions o paquets poden haver estat discontinuats. Aquest article ha estat escrit utilitzant la versió 4.3.3 de R.
+
+```{r version}
+# Verificar la versió de R
+R.version.string
+```
+
+Per a la nostra anàlisi, utilitzarem alguns paquets ja existents. Aquests paquets no són més que extensions per a R que normalment contenen dades o codis. Per utilitzar-los, hem d'instal·lar-los a l'ordinador, si encara no s'ha fet, i carregar-los en R. Un avantatge de carregar només els paquets necessaris (en lloc de tots els paquets instal·lats) és evitar processament computacional innecessari. El codi a continuació crea una llista dels paquets utilitzats en l'anàlisi present i els carrega, instal·lant els que encara no estaven presents.
+
+```{r message=FALSE}
+# Llistem els paquets que necessitem
+packages = c("quanteda", # Anàlisi quantitativa de dades textuals.
+             "quanteda.textmodels", # Complementa el quanteda, proporcionant funcionalitats específiques per a la modelització de text.
+             "quanteda.textstats", # Aquest paquet conté funcions per calcular estadístiques descriptives i mesures de complexitat de text, com la diversitat lèxica i la densitat lèxica.
+             "quanteda.textplots", # Aquest paquet ofereix eines per a la visualització de dades textuals, incloent gràfics de dispersió de paraules, núvols de paraules i mapes de calor.
+
+             "newsmap", # Per classificar documents, basant-se en "seed words", és a dir, paraules clau predefinides que indiquen temes o categories.
+             "readtext", # Per llegir diferents formats de text.
+             "spacyr", # Per a l'anotació de classes gramaticals, el reconeixement d'entitats i l'anotació sintàctica (python ha d'estar instal·lat).
+             "ggplot2", # Per a gràfic simple de les freqüències.
+             "seededlda", # Per a la modelització de temes (Topic Modeling).
+             "stringr", # Per a les expressions regulars.
+             "dplyr",  # Aquest paquet és part del tidyverse i ofereix un conjunt de funcions per a la manipulació de dades tabulars en R, permetent realitzar operacions com filtratge, selecció, agregació i unió de dades de manera simple i eficient.
+             "tidytext", # Aquest paquet complementa el tidyverse, proporcionant eines per a l'anàlisi de text conjuntament amb els principis d'organització de dades del tidyverse, permetent integrar fàcilment anàlisis de text en pipelines d'anàlisi de dades.
+             "knitr", # Aquest paquet és utilitzat per a la producció de documents dinàmics en R, permetent integrar codi R i resultats d'anàlisis en documents Markdown, HTML, PDF i altres formats.
+             "stringr", # Aquest paquet proporciona funcions per a la manipulació de cadenes de text en R, facilitant tasques com la coincidència de patrons, l'extracció de subcadenes i la manipulació de text.
+             "igraph", # Aquest paquet és utilitzat per a l'anàlisi i visualització de xarxes en R, oferint funcions per crear, manipular i representar gràfics i xarxes complexes. 
+             "topicmodels" # Aquest paquet és utilitzat per a la modelització de temes en textos, oferint implementacions d'algoritmes com LDA (Latent Dirichlet Allocation) i LSA (Latent Semantic Analysis) per a la inferència de temes en col·leccions de documents.
+             )
+
+# Instal·lem (si cal) i carreguem els paquets
+package.check <- lapply(
+  packages,
+  FUN = function(x) {
+    if (!require(x, character.only = TRUE)) {
+      install.packages(x, dependencies = TRUE)
+      require(x, character.only = TRUE)
+    }
+  }
+)
+
+```
+
+ls codis a continuació han estat implementats en la versió 4.0.2 de Quanteda. Utilitzar una versió diferent pot resultar en errors o resultats indesitjats. Per verificar la versió dels paquets, utilitzem la funció `packageVersion`. Per verificar la versió de R, utilitzem `R.version.string`.
+
+```{r}
+# Verificar versió del quanteda
+packageVersion("quanteda")
+```
+Finalment, necessitem establir quin serà el nostre directori de treball. Aquest serà el lloc on es guardaran els resultats. Per identificar quin és el directori de treball actual, utilitzem la funció getwd(), que retorna el camí absolut, és a dir, l'adreça completa del directori. Per definir una nova ubicació de treball, utilitzem la funció setwd(). Els arxius guardats en aquest directori es poden llegir només amb la indicació del nom de l'arxiu, ja que podem utilitzar el camí relatiu, és a dir, l'adreça de l'arxiu a partir del directori en què estem treballant.
+
+
+```{r echo=FALSE, eval=FALSE}
+# Per verificar en quin directori estem treballant
+getwd()
+
+# Per definir un nou directori de treball
+setwd("~/corpora/")
+```
+
+### 1.3 Dades
+
+Un cop instal·lats els paquets necessaris, es pot procedir a l'anàlisi del corpus. Per a això, necessitem carregar el corpus en R. Si estem treballant amb dades emmagatzemades localment, és a dir, disponibles a l'ordinador on es realitzaran les anàlisis, n'hi ha prou amb utilitzar la funció readtext(), indicant la ubicació (relativa o absoluta) de l'arxiu desitjat.
+
+El llibre 'Enllà' es pot llegir com un arxiu únic,
+
+```{r message=FALSE}
+# Per llegir un arxiu únic amb tot el contingut del llibre
+animes <- readtext("~/corpora/Ànimes atuïdes.txt", encoding = "utf-8")
+
+# Retorna l'estructura de l'objecte creat
+str(animes)
+```
+
+O considerant el llibre com una unitat dins d'un corpora format per diversos documents:
+
+```{r message=FALSE, warning=FALSE}
+# Llegir tots els arxius a la carpeta ldod del directori corpora 
+raventos_files <- readtext("~/corpora/raventos", encoding = "utf-8")
+
+# Retornar l'estructura de l'objecte creat
+str(raventos_files)
+
+```
+
+Els textos anteriors deriven de l'obra de Joan raventos, disponible no [Projeto Gutenberg](https://www.gutenberg.org/ebooks/author/46842.
+
+Els arcxius complets has estat guardats amb la codificació utf-8 i informació paratextual i editorial (com notes dels editors) que poguessin interferir en la recerca automàtica del programari han estat eliminades.
+
+Les anàlisis a continuació es demostraran utilitzant els dos corpora, en diferents moments.
+
+### 1.3.1 Neteja
+
+La neteja següent s'ha aplicat només als textos guardats per separat (´raventos_files`).
+L'arxiu amb el llibre en un únic text (`Enllà`) ja havia estat netejat anteriorment.
+
+```{r}
+# Creem una còpia per recuperar l'original en cas d'errors en la regex
+raventos_clean <- raventos_files
+
+## Eliminació dels elements indesitjats
+
+# Eliminar números al començament de línies (índex) 
+raventos_clean$text <- str_replace_all(raventos_clean$text, "\\n\\d", "\n")
+
+# Eliminar dates
+raventos_clean$text <- str_replace_all(raventos_clean$text, "\\d{1,2}-(\\d{1,2}|[IVX]{1,4})-19\\d{2}", "")
+
+```
+
+
+### 1.4 Investigacions amb el Quanteda
+Després que els arxius són carregats al sistema, necessitem crear un objecte "corpus", és a dir, el format necessari perquè Quanteda pugui processar i generar informació sobre el(s) text(os). Per a això, n'hi ha prou amb aplicar la funció `corpus`. Automàticament, el text es segmenta en tokens i frases. Els tokens corresponen a totes les ocurrències (incloent repeticions) de paraules, així com altres ítems com puntuació, números i símbols. En investigar el corpus amb la funció `summary`, obtenim el recompte de frases, tokens i types (el nombre de tokens diferents en un corpus).
+
+```{r}
+# Crear el corpus de diversos arxius
+corpus_clean <- corpus(raventos_clean)
+# ver um resumo do corpus
+summary(corpus_clean)
+```
+
+```{r}
+# Crear corpus de l'arxiu únic
+corpus_unico <- corpus(animes)
+summary(corpus_unico)
+```
+
+Si cal, podem alterar l'estructura del nostre corpus.
+En el `corpus_unico`, tenim un corpus fet amb només un text.
+Amb `corpus_reshape` podem crear un nou corpus en què cada frase sigui considerada un text, és a dir, una unitat.
+
+```{r}
+# Revelar el nombre de textos en el corpus
+ndoc(corpus_unico)
+
+# Remodelar el corpus, fent que cada frase sigui una unitat
+corpus_sents <- corpus_reshape(corpus_unico, to = "sentences")
+
+# Presentar un resum del corpus
+summary(corpus_sents)
+
+# Nombre total d'unitats en el nou format del corpus
+ndoc(corpus_sents)
+```
+
+Els exemples anteriors ens mostren que un corpus és un conjunt de textos amb informació sobre cada text (metadades), dels quals podem extreure fàcilment el recompte de tokens, types i frases per a cada text. Però, per a realitzar anàlisis quantitatives en el corpus, necessitem descompondre els textos en tokens (tokenització). També és possible filtrar-los, eliminant elements com puntuació, símbols, números, URL i separadors.
+
+```{r}
+# Tokenitzar els nostres tres corpora
+toks_unico <- tokens(corpus_unico)
+toks_sents <- tokens(corpus_sents)
+toks_files <- tokens(corpus_clean)
+
+
+## A sota filtrem els tres corpora de diverses maneres, per a demostració
+# Eliminar puntuació (corpus netejat amb regex)
+toks_nopunct_files <- tokens(corpus_clean, remove_punct = TRUE)
+toks_nopunct_unico <- tokens(corpus_unico, remove_punct = TRUE)
+
+# Eliminar números (corpus amb només un arxiu)
+toks_nonumbr <- tokens(corpus_unico, remove_numbers = TRUE)
+
+# Eliminar separadors (Unicode "Separator" [Z] i "Control" [C] categories) (corpus fet per frases)
+toks_nosept <- tokens(corpus_sents, remove_separators = TRUE)
+
+# Eliminar diversos elements al mateix temps (corpus amb només un arxiu)
+toks_simples <- tokens(corpus_unico, remove_numbers = TRUE, remove_symbols = TRUE, remove_punct = TRUE)
+
+```
+
+És possible també eliminar tokens indesitjats. Quanteda ofereix una llista de 'stopwords' per a diferents llengües. Les stopwords, o paraules buides en portuguès, són paraules a eliminar durant el processament de textos per a anàlisis computacionals. No hi ha una llista estàndard, però generalment les stopwords són les paraules més freqüentment utilitzades en una llengua, com preposicions i articles. El bloc a continuació elimina les paraules incloses a la llista de stopwords per al portuguès i també inclou altres paraules que es repeteixen en el corpus en qüestió.
+
+```{r}
+# Eliminar stopwords del corpus fet amb un únic arxiu s'ha de fer manulment
+toks_nostop <- tokens_select(toks_unico, pattern = c("de", "es", "i", "a", "o", "un", "una", "unes", "uns", "un", "tot", "també", "altre", "algun", "alguna", "alguns", "algunes", "com", "en", "per", "perquè", "per que", "estat", "estava", "ans", "abans", "éssent", "ambdós", "però", "per", "poder", "potser", "puc", "podem", "podeu", "poden", "vaig", "va", "van", "fer", "faig", "fa", "fem", "feu", "fan", "cada", "fi", "inclòs", "des de", "conseguir", "consegueixo", "consigueix", "consigueixes", "conseguim", "consigueixen", "anar", "haver", "tenir", "tinc", "te", "tenim", "teniu", "tene", "el", "la", "les", "els", "seu", "aquí", "meu", "teu", "ells", "elles", "ens", "si", "dins", "sols", "solament", "saber", "saps", "sap", "sabem", "sabeu", "saben", "últim", "llarg", "bastant", "fas", "molts", "aquells", "aquelles", "seus", "llavors", "ús", "molt", "era", "eres", "erem", "eren", "mode", "bé", "quant", "quan", "on", "mentre", "qui", "amb", "entre", "sense", "aquell", "que", "més", "del", "al", "no", "l", "què","tant", "hi", "us", "m", "ix", "ls","ja", "ai", "dels","ni", "lo", "he","se", "é", "li", "ha", "és", "em", "d'una", "d'un", "ell", "ella", "tan", "aquella","sa", "ho", "et", "oi"), selection = "remove")
+
+
+# Eliminar tokens específics del corpus fet amb diversos arxius i netejat amb regex, després de l'eliminació de les puntuacions
+toks_selected_files <- tokens_select(toks_nopunct_files, pattern = c("de", "es", "i", "a", "o", "un", "una", "unes", "uns", "un", "tot", "també", "altre", "algun", "alguna", "alguns", "algunes", "com", "en", "per", "perquè", "per que", "estat", "estava", "ans", "abans", "éssent", "ambdós", "però", "per", "poder", "potser", "puc", "podem", "podeu", "poden", "vaig", "va", "van", "fer", "faig", "fa", "fem", "feu", "fan", "cada", "fi", "inclòs", "des de", "conseguir", "consegueixo", "consigueix", "consigueixes", "conseguim", "consigueixen", "anar", "haver", "tenir", "tinc", "te", "tenim", "teniu", "tene", "el", "la", "les", "els", "seu", "aquí", "meu", "teu", "ells", "elles", "ens", "si", "dins", "sols", "solament", "saber", "saps", "sap", "sabem", "sabeu", "saben", "últim", "llarg", "bastant", "fas", "molts", "aquells", "aquelles", "seus", "llavors", "ús", "molt", "era", "eres", "erem", "eren", "mode", "bé", "quant", "quan", "on", "mentre", "qui", "amb", "entre", "sense", "aquell", "que", "més", "del", "al", "no", "l", "què","tant", "hi", "us", "m", "ix", "ls","ja", "ai", "dels","ni", "lo", "he","se", "é", "li", "ha", "és", "em", "d'una", "d'un", "ell", "ella", "tan", "aquella","sa", "ho", "et", "oi"), selection = "remove")
+
+
+# Eliminar tokens específics del corpus fet amb un arxiu, després de l'eliminació de les puntuacions
+toks_selected_unico <- tokens_select(toks_nopunct_unico, pattern = c("de", "es", "i", "a", "o", "un", "una", "unes", "uns", "un", "tot", "també", "altre", "algun", "alguna", "alguns", "algunes", "com", "en", "per", "perquè", "per que", "estat", "estava", "ans", "abans", "éssent", "ambdós", "però", "per", "poder", "potser", "puc", "podem", "podeu", "poden", "vaig", "va", "van", "fer", "faig", "fa", "fem", "feu", "fan", "cada", "fi", "inclòs", "des de", "conseguir", "consegueixo", "consigueix", "consigueixes", "conseguim", "consigueixen", "anar", "haver", "tenir", "tinc", "te", "tenim", "teniu", "tene", "el", "la", "les", "els", "seu", "aquí", "meu", "teu", "ells", "elles", "ens", "si", "dins", "sols", "solament", "saber", "saps", "sap", "sabem", "sabeu", "saben", "últim", "llarg", "bastant", "fas", "molts", "aquells", "aquelles", "seus", "llavors", "ús", "molt", "era", "eres", "erem", "eren", "mode", "bé", "quant", "quan", "on", "mentre", "qui", "amb", "entre", "sense", "aquell", "que", "més", "del", "al", "no", "l", "què","tant", "hi", "us", "m", "ix", "ls","ja", "ai", "dels","ni", "lo", "he","se", "é", "li", "ha", "és", "em", "d'una", "d'un", "ell", "ella", "tan", "aquella","sa", "ho", "et", "oi"), selection = "remove")
+
+
+```
+
+Després de la tokenització, el següent pas és crear una taula amb la freqüència de cada token per cada text, o, en termes de Quanteda, una `document-feature-matrix` (DFM). La DFM és un requisit previ per a diverses altres funcions en Quanteda, com és el cas de la `topfeatures`, que retorna els tokens més freqüents en un corpus.
+
+```{r}
+# Aquí podem veure les 20 paraules més freqüents quan eliminem
+
+# Números, símbols i puntuació
+dfm_simples <- dfm(toks_simples)
+print("Amb eliminació de nombres, símbols i puntuació")
+topfeatures(dfm_simples, 20)
+
+dfm_nostop <- dfm(toks_nostop)
+print("Eliminació de stopwords")
+topfeatures(dfm_nostop, 20)
+
+dfm_selected_unico <- dfm(toks_selected_unico)
+print("Eliminació de tokens seleccionats en el corpus prèviament netejat amb regex i sense stopwords")
+topfeatures(dfm_selected_unico, 20)
+
+dfm_selected_files <- dfm(toks_selected_files)
+print("Eliminació de tokens seleccionats en el corpus de fitxer únic i sense stopwords")
+topfeatures(dfm_selected_files, 20)
+```
+
+Després de generar la llista de tokens, podem explorar el corpus. Una de les tècniques més simples i utilitzades per a la investigació de corpus és a través de les línies de concordança, també conegudes com concordance lines o keywords in context (`kwic`). Les línies de concordança mostren fragments del corpus on ocorren els termes buscats. El nombre de paraules en el context pot ser estipulat per l'usuari, sent 5 tokens a l'esquerra i 5 a la dreta el patró. La primera columna indica el nom de l'arxiu on la paraula buscada ocorre. Hi ha diverses opcions per a cerques. Es poden fer per paraules o per fragments, seqüències o combinacions d'aquestes.
+
+
+```{r}
+# Ocurrències de paraules que comencen amb "feli"
+kwic(toks_unico, pattern =  "feli*")
+```
+
+
+
+```{r}
+# Podem també buscar per més d'una paraula al mateix temps
+kwic(toks_unico, pattern = c("feli*", "alegr*"))
+```
+
+
+
+```{r}
+# Per seqüència de més d'un token
+kwic(toks_unico, pattern = phrase("jo s*"))
+```
+
+#### 1.4.1 N-grams
+
+Les llistes de freqüència de paraules poden ser útils per identificar elements comuns en un text. No obstant això, en molts casos, és igualment important saber en quin context es troben aquestes paraules. Identificar quines paraules coocorren freqüentment en un corpus pot proporcionar-nos encara més informació sobre el text. Per exemple, saber que la seqüència 'estic trist' ocorre freqüentment en el corpus ens proporciona coneixements més rics que només la freqüència de la paraula 'trist' aïlladament. La seqüència 'estic trist' és un exemple del que anomenem n-grams, o, en aquest cas específic, bigrames. Els n-grams són seqüències de dues o més paraules que ocorren en un text. Per generar llistes de n-grams, partim d'una llista de tokens i especifiquem el nombre mínim i màxim de tokens en cada n-grama.
+
+```{r}
+# Crear una llista de 2-grama, 3-grama i 4-grama 
+toks_ngram <- tokens_ngrams(toks_simples, n = 2:4)
+# Visualitzar només els 30 més freqüents
+head(toks_ngram[[1]], 30)
+
+```
+
+#### 1.4.2 Diccionari
+Una altra forma d'extreure informació d'un text és mitjançant la creació de "diccionaris". La funció `dictionary` en Quanteda permet agrupar tokens per categories. Aquesta categorització pot ser utilitzada per fer cerques en el corpus. Per exemple, podem crear les categories "alegria" i "tristesa" que continguin paraules relacionades amb aquests sentiments, respectivament. Amb el diccionari creat, podem identificar la distribució d'aquests termes en un corpus.
+
+```{r}
+# Creació de diccionari a partir del corpus format per un únic document
+dict <- dictionary(list(alegria = c("alegr*", "allegr*", "feli*", "content*"),
+                        tristeza = c("trist*", "infeli*")))
+
+dict_toks <- tokens_lookup(toks_unico, dictionary = dict)
+print(dict_toks)
+dfm(dict_toks)
+```
+
+
+```{r}
+# Creació de diccionari a partir del corpus format per diversos documents
+dict <- dictionary(list(alegria = c("alegr*", "allegr*", "feli*", "content*"),
+                        tristeza = c("trist*", "infeli*")))
+
+dict_toks <- tokens_lookup(toks_files, dictionary = dict)
+print(dict_toks)
+dfm(dict_toks)
+```
+## 2 Visualització i anàlisi de dades
+
+### 2.1 Núvol de paraules i gràfic de freqüència
+
+En 1.4, vam crear una DFM amb la freqüència dels tokens. Per absorbir aquestes freqüències de manera més ràpida, podem generar visualitzacions. Una opció és el núvol de paraules, un gràfic que permet la ràpida visualització dels termes més freqüents.
+
+```{r}
+# Demostració de com les freqüències de paraules canvien d'acord amb la preparació del corpus
+
+set.seed(100) # Per a la reproducció dels resultats
+textplot_wordcloud(dfm_selected_unico, min_count = 6, random_order = FALSE, rotation = .25, color = RColorBrewer::brewer.pal(8, "Dark2"))
+
+set.seed(100) 
+textplot_wordcloud(dfm_selected_files, min_count = 6, random_order = FALSE, rotation = .25, color = RColorBrewer::brewer.pal(8, "Dark2"))
+
+set.seed(100)
+textplot_wordcloud(dfm_nostop, min_count = 6, random_order = FALSE, rotation = .25, color = RColorBrewer::brewer.pal(8, "Dark2"))
+
+```
+
+
+na altra solució és utilitzar la biblioteca `ggplot` i representar en un gràfic el nombre d'ocurrències de les paraules més freqüents.
+
+```{r}
+# A partir del corpus format per un únic document
+
+dfm_selected_unico %>% 
+  textstat_frequency(n = 20) %>% 
+  ggplot(aes(x = reorder(feature, frequency), y = frequency)) +
+  geom_point() +
+  coord_flip() +
+  labs(x = NULL, y = "Frequência") +
+  theme_minimal()
+```
+```{r}
+# A partir d'un corpus format per diversos documents
+
+dfm_selected_files %>% 
+  textstat_frequency(n = 20) %>% 
+  ggplot(aes(x = reorder(feature, frequency), y = frequency)) +
+  geom_point() +
+  coord_flip() +
+  labs(x = NULL, y = "Frequência") +
+  theme_minimal()
+```
+
+### 2.2 Modelatge de temes (LDA)
+
+Una altra funció freqüentment utilitzada en el Processament del Llenguatge Natural (PLN) és el modelatge de temes, també conegut com a topic modeling (TM). El modelatge de temes aplica un model estadístic que busca comprendre l'estructura del corpus i identificar i agrupar paraules que es relacionen d'alguna manera entre elles. El TM utilitza una tècnica semi o no supervisada per a la identificació d'aquests temes. En altres paraules, el programa aprèn a reconèixer patrons en les dades sense la necessitat d'anotacions prèvies. El codi següent demostra l'aplicació del model Latent Dirichlet Allocation (LDA).
+
+```{r}
+# Topic modeling a partir del corpus format per un únic document
+tmod_lda <- textmodel_lda(dfm_selected_unico, k = 10, verbose = TRUE)
+terms(tmod_lda, 10)
+```
+
+
+```{r}
+# Topic modeling a partir d'un corpus format per diversos documents
+
+tmod_lda <- textmodel_lda(dfm_selected_files, k = 10, verbose = TRUE)
+terms(tmod_lda, 10)
+
+```
+
+
+### 2.3 Xarxa semàntica
+El Feature co-occurrence matrix (FCM) és semblant al DFM, però considera les coocurrències, presentant un gràfic amb les xarxes semàntiques.
+
+```{r}
+# Xarxa a partir del corpus format per un únic document
+
+# Crear fcm a partir de dfm
+fcm_nostop <- fcm(dfm_selected_unico)
+# Llistar les top features
+feat <- names(topfeatures(dfm_selected_unico, 50)) 
+# Seleccionar
+fcm_select <- fcm_select(fcm_nostop, pattern = feat, selection = "keep") 
+
+size <- log(colSums(dfm_select(dfm_selected_unico, feat, selection = "keep"))) 
+
+textplot_network(fcm_select, min_freq = 0.8, vertex_size = size / max(size) * 3)
+
+
+
+```
+
+
+```{r}
+
+# Xarxa a partir d'un corpus format per diversos documents
+
+# Crear fcm a partir de dfm
+fcm_nostop <- fcm(dfm_selected_files)
+# Llistar les top features
+feat <- names(topfeatures(dfm_selected_files, 50)) 
+# Seleccionar
+fcm_select <- fcm_select(fcm_nostop, pattern = feat, selection = "keep") 
+
+size <- log(colSums(dfm_select(dfm_selected_files, feat, selection = "keep"))) 
+
+textplot_network(fcm_select, min_freq = 0.8, vertex_size = size / max(size) * 3)
+
+```
+
+### Dades i repositori
+
+Les dades i codis estan disponibles via github
+<https://github.com/DiegoEGimenez/R_literatura_Quanteda>
+
+
+***
+
+## Agradiments
+Aquest document (2024) conté una revisió i ampliació de codis originalment preparats per Diego Giménez i Andressa Gomide el 2022 per a l'anàlisi del "Llibre del Desassossec". Alguns dels codis descrits en el document de 2022 van utilitzar els codis gentilment cedits per Mark Alfano, utilitzats en el seu treball "Nietzsche corpus analysis".
