@@ -1,0 +1,447 @@
+---
+title: 'R in literary analysis in English'
+author: "Diego Giménez"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+R codes used for distant reading analysis in English (Giménez, 2024). This document updates and expands a previous version developed by Diego Giménez and Andresa Gomide in 2022, which focused on the analysis of "The Book of Disquiet". In this new version, works by James Joyce are analyzed, including "Ulysses", "Dubliners" and "A Portrait of the Artist as a Young Man".
+
+## 1 Tools and Data Preparation
+
+### 1.1 Installation
+
+[Quanteda](https://quanteda.io/) (Quantitative Analysis of Textual Data) is an R package for the manipulation and analysis of textual data.
+
+The installation of R varies according to the operating system (e.g., Windows, Mac, Linux), as well as its different versions. There are several sources where you can get updated instructions on how to install R (e.g., https://didatica.tech/como-instalar-a-linguagem-r-e-o-rstudio/). The Comprehensive R Archive Network (CRAN), the official distribution network of R, offers reliable instructions for this, although perhaps not as detailed as in other sources.
+
+Another suggestion is to install a Graphical User Interface (GUI). GUIs considerably facilitate user interaction with the computer. RStudio is the most used GUI for R and, like R, it is free and open-source.
+
+### 1.2 Configuration: preparing the environment
+
+When reusing codes, it is good practice to be aware of the installed version of both R and the libraries used. It is not necessary for the versions to be the same as those used during the creation of the codes; however, in some cases, there may be incompatibility between different versions, and some functions or packages may have been discontinued. This article was written using version 4.3.3 of R.
+
+```{r version}
+# Check the R version
+
+R.version.string
+```
+
+For our analysis, we will use some existing packages. These packages are nothing more than extensions for R that usually contain data or codes. To use them, we need to install them on the computer, if it has not already been done, and load them into R. One advantage of loading only the necessary packages (rather than all installed packages) is to avoid unnecessary computational processing. The code below creates a list of the packages used in the present analysis and loads them, installing those that were not present.
+
+```{r message=FALSE}
+
+# We list the packages we need
+
+packages = c("quanteda", # Quantitative analysis of textual data.
+             "quanteda.textmodels", # Complements Quanteda, providing specific functionalities for text modeling.
+             "quanteda.textstats", # This package contains functions to calculate descriptive statistics and measures of text complexity, such as lexical diversity and lexical density.
+             "quanteda.textplots", # This package offers tools for visualizing textual data, including word scatter plots, word clouds, and heatmaps.
+             "newsmap", # For document classification, based on "seed words," i.e., predefined keywords indicating topics or categories.
+             "readtext", # For reading different text formats.
+             "spacyr", # For grammatical class annotation, entity recognition, and syntactic annotation (Python must be installed).
+             "ggplot2", # For simple frequency graphs.
+             "seededlda", # For topic modeling.
+             "stringr", # For regular expressions.
+             "dplyr",  # This package is part of the tidyverse and offers a set of functions for tabular data manipulation in R, allowing operations like filtering, selection, aggregation, and data merging easily and efficiently.
+             "tidytext", # This package complements tidyverse, providing tools for text analysis along with tidyverse's data organization principles, allowing easy integration of text analysis into data analysis pipelines.
+             "knitr", # This package is used for producing dynamic documents in R, allowing integration of R code and analysis results into Markdown, HTML, PDF, and other formats.
+             "stringr", #This package provides functions for text string manipulation in R, facilitating tasks such as pattern matching, substring extraction, and text manipulation.
+             "igraph", # This package is used for network analysis and visualization in R, offering functions for creating, manipulating, and representing graphs and complex networks.
+             "topicmodels" # This package is used for topic modeling in texts, offering implementations of algorithms like LDA (Latent Dirichlet Allocation) and LSA (Latent Semantic Analysis) for topic inference in collections of documents.
+             )
+
+# We install (if necessary) and load the packages.
+package.check <- lapply(
+  packages,
+  FUN = function(x) {
+    if (!require(x, character.only = TRUE)) {
+      install.packages(x, dependencies = TRUE)
+      require(x, character.only = TRUE)
+    }
+  }
+)
+
+```
+
+The codes below were implemented in version 4.0.2 of Quanteda. Using a different version may result in errors or undesired results. To check the version of the packages, we use the `packageVersion` function. To check the version of R, we use `R.version.string`.
+
+```{r}
+# Check the version of Quanteda.
+
+packageVersion("quanteda")
+```
+Finally, we need to establish what our working directory will be. This will be the location where the results will be saved. To identify what the current working directory is, we use the getwd() function, which returns the absolute path, i.e., the complete address of the directory. To set a new working location, we use the setwd() function. Files saved in this directory can be read by simply indicating the file name because we can use the relative path, i.e., the file address from the directory we are working in.
+
+```{r echo=FALSE, eval=FALSE}
+
+# To check the directory we are working in
+
+getwd()
+
+# To define a new working directory
+
+setwd("~/corpora/")
+```
+
+### 1.3 Data
+
+Once the necessary packages are installed, we can proceed with the analysis of the corpus. For this, we need to load the corpus into R. If we are working with data stored locally, that is, available on the computer where the analyzes will be performed, simply use the readtext() function, indicating the location (relative or absolute) of the desired file.
+
+The book 'Ulysses' can be read as a single file,
+
+```{r message=FALSE}
+# To read a single file with all the content of the book
+
+ulysses <- readtext("~/corpora/Ulysses.txt", encoding = "utf-8")
+
+# Returns the structure of the created object
+
+str(ulysses)
+```
+
+Or considering the book as a unit within a corpus formed by several documents:
+
+```{r message=FALSE, warning=FALSE}
+
+# Read all files in the ldod folder of the corpora directory 
+
+joyce_files <- readtext("~/corpora/joyce", encoding = "utf-8")
+
+# Returns the structure of the created object
+
+str(joyce_files)
+
+```
+
+The texts above derive from the work by James Joyce, available in [Project Gutenberg](https://www.gutenberg.org/ebooks/author/1039).
+
+The files were  saved with utf-8 encoding, and pre-textual and editorial information (such as editors' notes) that could interfere with the software's automatic search were eliminated.
+
+The analyzes below will be demonstrated using the two corpora, at different times.
+
+### 1.3.1 Cleaning
+
+The cleaning below was applied only to the texts saved separately (´joyce_files`). The file with the book in a single text (`Ulysses`) had already been cleaned previously.
+
+```{r}
+# We create a copy to recover the original in case there are errors in the regex
+
+joyce_clean <- joyce_files
+
+## Removal of unwanted elements
+
+
+# Remove numbers at the beginning of lines (indices)
+
+joyce_clean$text <- str_replace_all(joyce_clean$text, "\\n\\d", "\n")
+
+# Remove dates
+
+joyce_clean$text <- str_replace_all(joyce_clean$text, "\\d{1,2}-(\\d{1,2}|[IVX]{1,4})-19\\d{2}", "")
+
+```
+
+### 1.4 Research with Quanteda
+
+After the files are loaded into the system, we need to create a "corpus" object, that is, the format necessary for Quanteda to process and generate information about the text(s). To do this, just apply the 'corpus' function. Automatically, the text is segmented into tokens and sentences. Tokens correspond to all occurrences (including repetitions) of words, as well as other items such as punctuation, numbers, and symbols. When we investigate the corpus with the 'summary' function, we obtain the count of sentences, tokens, and types (the number of distinct tokens in a corpus).
+
+```{r}
+# Create the corpus from multiple files
+
+corpus_clean <- corpus(joyce_clean)
+
+# Present a summary of the corpus
+
+summary(corpus_clean)
+```
+
+```{r}
+# Create a corpus from the single file
+
+corpus_unico <- corpus(ulysses)
+
+# Present a summary of the corpus
+
+summary(corpus_unico)
+```
+
+If necessary, we can change the structure of our corpus. In 'corpus_unico', we have a corpus made with only one text. With 'corpus_reshape', we can create a new corpus where each sentence is considered a text, that is, a unit.
+
+```{r}
+# Reveal the number of texts in the corpus
+
+ndoc(corpus_unico)
+
+# Restructure the corpus, converting each sentence into a unit
+
+corpus_sents <- corpus_reshape(corpus_unico, to = "sentences")
+
+# Present a summary of the corpus
+
+summary(corpus_sents)
+
+# Total number of units in the new corpus structure
+
+ndoc(corpus_sents)
+```
+
+The examples above show us that a corpus is a set of texts with information about each text (metadata), from which we can easily extract the count of tokens, types, and sentences for each text. However, to perform quantitative analyzes on the corpus, we need to break the texts into tokens (tokenization). It is also possible to filter them, removing elements such as punctuation, symbols, numbers, URLs, and separators.
+
+```{r}
+# Tokenize our three corpora
+
+toks_unico <- tokens(corpus_unico)
+toks_sents <- tokens(corpus_sents)
+toks_files <- tokens(corpus_clean)
+
+
+## Next, we filter the three corpora in various ways, for demonstration
+
+# Remove punctuation (clean corpus with regex)
+
+toks_nopunct_files <- tokens(corpus_clean, remove_punct = TRUE)
+toks_nopunct_unico <- tokens(corpus_unico, remove_punct = TRUE)
+
+# Remove numbers (corpus with only one file)
+
+toks_nonumbr <- tokens(corpus_unico, remove_numbers = TRUE)
+
+# Remove separators (Unicode categories "Separator" [Z] and "Control" [C]) (corpus made by sentences)
+
+toks_nosept <- tokens(corpus_sents, remove_separators = TRUE)
+
+# Remove various elements at the same time (corpus with only one file)
+
+toks_simples <- tokens(corpus_unico, remove_numbers = TRUE, remove_symbols = TRUE, remove_punct = TRUE)
+
+```
+
+It is also possible to remove unwanted tokens. Quanteda offers a list of 'stopwords' for different languages. Stopwords, or empty words in Portuguese, are words to be removed during text processing for computational analyses. There is no standard list, but generally stopwords are the most frequently used words in a language, such as prepositions and articles. The block below eliminates the words included in the list of stopwords for Portuguese and also includes other words that are repeated in the corpus in question.
+
+```{r}
+# Remove stopwords from the corpus made with a single file
+
+toks_nostop <- tokens_select(toks_unico, pattern = stopwords("en"), selection = "remove")
+
+# Remove specific tokens from the corpus made with multiple files and cleaned with regex, after removing punctuation
+
+toks_selected_files <- tokens_select(toks_nopunct_files, pattern = c("o", "said", "say", "says", "like", "come", "get", "us", "go", "must", "put", "can", "j", "let", "came", "ask", "asked", "don't", "went", "got", "give", "much", "it's", "that's", "I'm", "he’s", "she's", "give", "gave", "told", "tell", "mr", "one", "two", "three", "don't", "sir", "mrs", "just", "might", "it’s", "don’t", "that’s", "I’m", "he’s", "she’s", stopwords("en")), selection = "remove")
+
+# Remove specific tokens from the corpus made with one file, after removing punctuation
+
+toks_selected_unico <- tokens_select(toks_nopunct_unico, pattern = c("o", "said", "say", "says", "like", "come", "get", "us", "go", "must", "put", "can", "j", "let", "came", "ask", "asked", "don't", "went", "got", "give", "much", "it's", "that's", "I'm", "he’s", "she's", "give", "gave", "told", "tell", "mr", "one", "two", "three", "don't", "sir", "mrs", "just", "might", "it’s", "don’t", "that’s", "I’m", "he’s", "she’s", stopwords("en")), selection = "remove")
+```
+
+After tokenization, the next step is to create a table with the frequency of each token for each text, or, in Quanteda's terms, a `document-feature-matrix` (DFM). The DFM is a prerequisite for several other functions in Quanteda, such as `topfeatures`, which returns the most frequent tokens in a corpus.
+
+```{r}
+# Here we can see the 20 most frequent words when removing numbers, symbols, and punctuation
+
+dfm_simples <- dfm(toks_simples)
+print("With the removal of numbers, symbols, and punctuation")
+topfeatures(dfm_simples, 20)
+
+dfm_nostop <- dfm(toks_nostop)
+print("Removal of stopwords")
+topfeatures(dfm_nostop, 20)
+
+dfm_selected_unico <- dfm(toks_selected_unico)
+print("Removal of selected tokens in the corpus previously cleaned with regex and without stopwords")
+topfeatures(dfm_selected_unico, 20)
+
+dfm_selected_files <- dfm(toks_selected_files)
+print("Removal of selected tokens in the single file corpus and without stopwords")
+topfeatures(dfm_selected_files, 20)
+```
+
+After generating the token list, we can explore the corpus. One of the simplest and most used techniques for corpus investigation is through concordance lines, also known as concordance lines or keywords in context (`kwic`). Concordance lines show fragments of the corpus where the searched terms occur. The number of words in the context can be stipulated by the user, with 5 tokens to the left and 5 to the right being the standard. The first column indicates the name of the file where the searched word occurs. There are several options for searches. They can be made by words or by fragments, sequences, or combinations thereof.
+
+```{r}
+# Occurrences of words that start with "feli*"
+kwic(toks_unico, pattern =  "happ*")
+```
+
+```{r}
+# We can also search for more than one word at the same time
+kwic(toks_unico, pattern = c("happ*", "joy*"))
+```
+
+```{r}
+# By sequence of more than one token
+kwic(toks_unico, pattern = phrase("I dream*"))
+```
+
+#### 1.4.1 N-grams
+
+Word frequency lists can be useful for identifying common elements in a text. However, in many cases, it is equally important to know in what context these words are. Identifying which words frequently co-occur in a corpus can provide us with even more information about the text. For example, knowing that the sequence 'I am sad' frequently occurs in the corpus gives us richer insights than just the frequency of the word 'sad' alone. The sequence 'I am sad' is an example of what we call n-grams, or, in this specific case, bigrams. N-grams are sequences of two or more words that occur in a text. To generate lists of n-grams, we start from a list of tokens and specify the minimum and maximum number of tokens in each n-gram.
+
+```{r}
+# Create a list of bigrams, trigrams, and tetragrams 
+toks_ngram <- tokens_ngrams(toks_simples, n = 2:4)
+
+# Visualize only the 30 most frequent
+head(toks_ngram[[1]], 30)
+
+```
+
+#### 1.4.2 Dictionary
+
+Another way to extract information from a text is through the creation of "dictionaries". The `dictionary` function in Quanteda allows grouping tokens by categories. This categorization can then be used for searches in the corpus. For example, we can create the categories "joy" and "sadness" containing words related to these feelings, respectively. With the dictionary created, we can identify the distribution of these terms in a corpus.
+
+```{r}
+# Create a dictionary from the corpus formed by a single document
+
+dict <- dictionary(list(happiness = c("happ*", "joy*", "smil*", "content*", "cheer*", "delig*"),
+                        sadness = c("sad*", "unhapp*", "soorw*", "depress*", "dejec*", "misera*")))
+
+dict_toks <- tokens_lookup(toks_unico, dictionary = dict)
+print(dict_toks)
+dfm(dict_toks)
+```
+
+
+```{r}
+# Create a dictionary from the corpus formed by multiple documents
+
+dict <- dictionary(list(happiness = c("happ*", "joy*", "smil*", "content*", "cheer*", "delig*"),
+                        sadness = c("sad*", "unhapp*", "soorw*", "depress*", "dejec*", "misera*")))
+
+dict_toks <- tokens_lookup(toks_files, dictionary = dict)
+print(dict_toks)
+dfm(dict_toks)
+```
+
+## 2 Data Visualization and Analysis
+
+### 2.1 Word Cloud and Frequency Graph
+
+In 1.4, we created a DFM with the frequency of tokens. To absorb these frequencies more quickly, we can generate visualizations. One option is the word cloud, a graph that allows for quick visualization of the most frequent terms.
+
+```{r}
+# Demonstration of how word frequencies change depending on the corpus preparation
+
+set.seed(100) # For the reproduction of the results
+
+textplot_wordcloud(dfm_selected_unico, min_count = 6, random_order = FALSE, rotation = .25, color = RColorBrewer::brewer.pal(8, "Dark2"))
+
+set.seed(100) 
+textplot_wordcloud(dfm_selected_files, min_count = 6, random_order = FALSE, rotation = .25, color = RColorBrewer::brewer.pal(8, "Dark2"))
+
+set.seed(100)
+textplot_wordcloud(dfm_nostop, min_count = 6, random_order = FALSE, rotation = .25, color = RColorBrewer::brewer.pal(8, "Dark2"))
+
+```
+
+Another solution is to use the ´ggplot` library and represent in a graph the number of occurrences of the most frequent words.
+
+```{r}
+# From the corpus formed by a single document
+
+dfm_selected_unico %>% 
+  textstat_frequency(n = 20) %>% 
+  ggplot(aes(x = reorder(feature, frequency), y = frequency)) +
+  geom_point() +
+  coord_flip() +
+  labs(x = NULL, y = "Frequência") +
+  theme_minimal()
+```
+
+```{r}
+# From a corpus formed by multiple documents
+
+dfm_selected_files %>% 
+  textstat_frequency(n = 20) %>% 
+  ggplot(aes(x = reorder(feature, frequency), y = frequency)) +
+  geom_point() +
+  coord_flip() +
+  labs(x = NULL, y = "Frequência") +
+  theme_minimal()
+```
+
+### 2.2 Topic Modeling (LDA)
+
+Another function frequently used in Natural Language Processing (NLP) is topic modeling (TM). Topic modeling applies a statistical model that seeks to understand the structure of the corpus and identify and group words that are related in some way. TM uses a semi or unsupervised technique to identify these topics. In other words, the program learns to recognize patterns in the data without the need for prior annotations. The code below demonstrates the application of the Latent Dirichlet Allocation (LDA) model.
+
+```{r}
+# Topic modeling from the corpus formed by a single document
+
+lda <- LDA(dfm_selected_unico, k = 10)
+terms(lda, 10)
+```
+
+
+```{r}
+# Topic modeling from a corpus formed by multiple documents
+
+lda <- LDA(dfm_selected_files, k = 10)
+terms(lda, 10)
+
+```
+
+### 2.3 Semantic Network
+
+The Feature `Co-occurrence Matrix` (FCM) is similar to the DFM but considers co-occurrences, presenting a graph with semantic networks.
+
+```{r}
+# Network from the corpus formed by a single document
+
+# Create FCM from DFM
+fcm_nostop <- fcm(dfm_selected_unico)
+
+# List the top features
+feat <- names(topfeatures(dfm_selected_unico, 50)) 
+
+# Select
+fcm_select <- fcm_select(fcm_nostop, pattern = feat, selection = "keep") 
+
+size <- log(colSums(dfm_select(dfm_selected_unico, feat, selection = "keep"))) 
+
+textplot_network(fcm_select, min_freq = 0.8, vertex_size = size / max(size) * 3)
+
+
+
+```
+
+
+```{r}
+
+# Network from a corpus formed by multiple documents
+
+# Create a Feature Co-occurrence Matrix (FCM) from DFM
+fcm_nostop <- fcm(dfm_selected_files)
+
+# List the top features
+feat <- names(topfeatures(dfm_selected_files, 50)) 
+
+# Select features for the FCM
+fcm_select <- fcm_select(fcm_nostop, pattern = feat, selection = "keep") 
+
+# Calculate vertex sizes
+size <- log(colSums(dfm_select(dfm_selected_files, feat, selection = "keep"))) 
+
+textplot_network(fcm_select, min_freq = 0.8, vertex_size = size / max(size) * 3)
+
+```
+
+### Data and Repository
+
+The data and codes are available via GitHub
+https://github.com/DiegoEGimenez/R_literatura_Quanteda
+
+The code can be viewed at
+https://rpubs.com/DiegoEGimenez/1192115
+
+***
+
+## Acknowledgments
+This document (2024) contains a review and expansion of codes originally prepared by Diego Giménez and Andressa Gomide in 2022 for the analysis of "The Book of Disquiet". Some of the codes described in the 2022 document used the codes kindly provided by Mark Alfano, used in his work "Nietzsche corpus analysis".
